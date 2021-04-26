@@ -1,4 +1,4 @@
-module duh-uh.com/app/twitter-to-rss
+module duh-uh.com/app/twitterrss/atlasobscura
 
 go 1.15
 

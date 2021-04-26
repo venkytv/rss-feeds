@@ -177,5 +177,9 @@ func main() {
 		return feedItems[i].created.After(feedItems[j].created)
 	})
 	feed := genFeed(feedItems, FeedUrl(feedUrl))
-	fmt.Println(feed.ToAtom())
+	atom, err := feed.ToAtom()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(atom)
 }
