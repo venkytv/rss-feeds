@@ -35,13 +35,13 @@ type FeedUrl string
 
 var utm_re = regexp.MustCompile(`\?utm_.*$`)
 
-func genFeed(items []FeedItem, url FeedUrl) *feeds.Feed {
+func genFeed(items []FeedItem, url FeedUrl, createTime time.Time) (string, error) {
 	feed := &feeds.Feed{
 		Title:       FeedTitle,
 		Link:        &feeds.Link{Href: string(url)},
 		Description: FeedDescription,
 		Author:      &feeds.Author{Name: FeedAuthor, Email: FeedAuthorEmail},
-		Created:     time.Now(),
+		Created:     createTime,
 	}
 	for _, item := range items {
 		feed.Add(&feeds.Item{
@@ -51,7 +51,11 @@ func genFeed(items []FeedItem, url FeedUrl) *feeds.Feed {
 		})
 	}
 
-	return feed
+	atom, err := feed.ToAtom()
+	if err != nil {
+		return "", err
+	}
+	return atom, nil
 }
 
 func gen(items []FeedItem) <-chan FeedItem {
@@ -117,6 +121,10 @@ func fixAllUrls(items []FeedItem) ([]FeedItem, error) {
 		out = append(out, r.item)
 	}
 
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].created.After(out[j].created)
+	})
+
 	return out, nil
 }
 
@@ -173,13 +181,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	sort.Slice(feedItems, func(i, j int) bool {
-		return feedItems[i].created.After(feedItems[j].created)
-	})
-	feed := genFeed(feedItems, FeedUrl(feedUrl))
-	atom, err := feed.ToAtom()
+
+	feed, err := genFeed(feedItems, FeedUrl(feedUrl), time.Now())
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(atom)
+
+	fmt.Println(feed)
 }
