@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -18,12 +19,13 @@ type TestFeedItem struct {
 }
 
 func TestFixAllUrls(t *testing.T) {
+	ctx := context.Background()
 	feedItems := make([]FeedItem, 0)
 	var err error
 
 	t.Run("EmptyFeed", func(t *testing.T) {
 		feedItems = nil
-		feedItems, err = fixAllUrls(feedItems)
+		feedItems, err = fixAllUrls(ctx, feedItems)
 		assert.Nil(t, err)
 	})
 
@@ -56,7 +58,7 @@ func TestFixAllUrls(t *testing.T) {
 				created: item.Created,
 			})
 		}
-		feedItems, err = fixAllUrls(feedItems)
+		feedItems, err = fixAllUrls(ctx, feedItems)
 		assert.Nil(t, err)
 		assert.Len(t, feedItems, 3)
 		assert.Equal(t, wantItems, feedItems)

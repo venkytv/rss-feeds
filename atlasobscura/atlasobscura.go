@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ const (
 	FeedDescription = "Atlas Obscura Tweets"
 	FeedAuthor      = "Venky"
 	FeedAuthorEmail = "venkytv@gmail.com"
+	Timeout         = 10 * time.Second
 )
 
 type FeedItem struct {
@@ -74,9 +76,12 @@ type result struct {
 	err  error
 }
 
-func fixer(done <-chan struct{}, items <-chan FeedItem, c chan<- result) {
+func fixer(ctx context.Context, items <-chan FeedItem, c chan<- result) {
 	for item := range items {
-		resp, err := http.Get(item.url)
+		client := http.Client{
+			Timeout: Timeout,
+		}
+		resp, err := client.Head(item.url)
 		if err == nil {
 			url := utm_re.ReplaceAllString(
 				resp.Request.URL.String(), "")
@@ -84,17 +89,13 @@ func fixer(done <-chan struct{}, items <-chan FeedItem, c chan<- result) {
 		}
 		select {
 		case c <- result{item, err}:
-		case <-done:
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func fixAllUrls(items []FeedItem) ([]FeedItem, error) {
-	// Set up a done channel to signal completion
-	done := make(chan struct{})
-	defer close(done)
-
+func fixAllUrls(ctx context.Context, items []FeedItem) ([]FeedItem, error) {
 	items_chan := gen(items)
 
 	// Start a fixed number of channels to fix URLs
@@ -104,7 +105,7 @@ func fixAllUrls(items []FeedItem) ([]FeedItem, error) {
 	wg.Add(numFixers)
 	for i := 0; i < numFixers; i++ {
 		go func() {
-			fixer(done, items_chan, c)
+			fixer(ctx, items_chan, c)
 			wg.Done()
 		}()
 	}
@@ -128,8 +129,10 @@ func fixAllUrls(items []FeedItem) ([]FeedItem, error) {
 	return out, nil
 }
 
-func main() {
-	ctx := context.Background()
+func fetchFeed(w http.ResponseWriter, req *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel() // Cancel context once feeds are fetched
+
 	token, ok := os.LookupEnv(BearerTokenEnv)
 	if !ok {
 		log.Fatal("Env var not set: ", BearerTokenEnv)
@@ -177,7 +180,7 @@ func main() {
 		})
 	}
 
-	feedItems, err = fixAllUrls(feedItems)
+	feedItems, err = fixAllUrls(ctx, feedItems)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -187,5 +190,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(feed)
+	io.WriteString(w, feed)
+}
+
+func main() {
+	srv := http.Server{
+		Addr:         ":8080",
+		ReadTimeout:  Timeout / 2.0,
+		WriteTimeout: Timeout,
+		Handler: http.TimeoutHandler(http.HandlerFunc(fetchFeed),
+			Timeout, "Timeout!\n"),
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatalf("Server failed: %v\n", err)
+	}
 }
