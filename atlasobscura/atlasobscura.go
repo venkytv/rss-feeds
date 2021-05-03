@@ -14,6 +14,7 @@ import (
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/gorilla/feeds"
+	"github.com/patrickmn/go-cache"
 	"golang.org/x/oauth2"
 )
 
@@ -25,6 +26,7 @@ const (
 	FeedAuthor      = "Venky"
 	FeedAuthorEmail = "venkytv@gmail.com"
 	Timeout         = 10 * time.Second
+	CacheInterval   = 30 * time.Minute
 )
 
 type FeedItem struct {
@@ -36,6 +38,9 @@ type FeedItem struct {
 type FeedUrl string
 
 var utm_re = regexp.MustCompile(`\?utm_.*$`)
+
+// Cache feed indefinitely
+var feedCache = cache.New(0, 0)
 
 func genFeed(items []FeedItem, url FeedUrl, createTime time.Time) (string, error) {
 	feed := &feeds.Feed{
@@ -129,7 +134,8 @@ func fixAllUrls(ctx context.Context, items []FeedItem) ([]FeedItem, error) {
 	return out, nil
 }
 
-func fetchFeed(w http.ResponseWriter, req *http.Request) {
+func cacheFeed() {
+	log.Print("Caching feed")
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel() // Cancel context once feeds are fetched
 
@@ -190,10 +196,40 @@ func fetchFeed(w http.ResponseWriter, req *http.Request) {
 		log.Fatal(err)
 	}
 
-	io.WriteString(w, feed)
+	feedCache.Set("feed", feed, cache.NoExpiration)
+}
+
+func fetchFeed(w http.ResponseWriter, req *http.Request) {
+	feed, found := feedCache.Get("feed")
+	if !found {
+		log.Print("Cached feed not found")
+		cacheFeed()
+		feed, found = feedCache.Get("feed")
+	}
+	io.WriteString(w, feed.(string))
 }
 
 func main() {
+	// Cache feed at startup
+	cacheFeed()
+
+	ticker := time.NewTicker(CacheInterval)
+	defer ticker.Stop()
+
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				cacheFeed()
+			}
+		}
+	}()
+
+	log.Print("Starting server")
 	srv := http.Server{
 		Addr:         ":8080",
 		ReadTimeout:  Timeout / 2.0,
