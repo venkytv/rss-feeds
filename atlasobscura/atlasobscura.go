@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -154,11 +153,6 @@ func cacheFeed() {
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := twitter.NewClient(tc)
-
-	demux := twitter.NewSwitchDemux()
-	demux.Tweet = func(tweet *twitter.Tweet) {
-		fmt.Println(tweet.Text)
-	}
 
 	tweet_re := regexp.MustCompile(`(.*?)\s(https?://.*)`)
 
