@@ -167,6 +167,10 @@ func cacheFeed() {
 	for _, message := range tweets {
 		tweet := message.Text
 		t := tweet_re.FindStringSubmatch(tweet)
+		if len(t) < 2 {
+			log.Println("No URL in tweet: ", tweet)
+			continue
+		}
 		text := t[1]
 		url := t[2]
 		createdAt, err := message.CreatedAtTime()
