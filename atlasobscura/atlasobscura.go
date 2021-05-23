@@ -36,10 +36,11 @@ type FeedItem struct {
 
 type FeedUrl string
 
-var utm_re = regexp.MustCompile(`\?utm_.*$`)
+type tweetReader interface {
+	getTweets(context.Context) ([]twitter.Tweet, error)
+}
 
-// Cache feed indefinitely
-var feedCache = cache.New(0, 0)
+var utm_re = regexp.MustCompile(`\?utm_.*$`)
 
 func genFeed(items []FeedItem, url FeedUrl, createTime time.Time) (string, error) {
 	feed := &feeds.Feed{
@@ -133,19 +134,12 @@ func fixAllUrls(ctx context.Context, items []FeedItem) ([]FeedItem, error) {
 	return out, nil
 }
 
-func cacheFeed() {
-	log.Print("Caching feed")
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel() // Cancel context once feeds are fetched
+type tweetReaderImpl struct{}
 
+func (r tweetReaderImpl) getTweets(ctx context.Context) ([]twitter.Tweet, error) {
 	token, ok := os.LookupEnv(BearerTokenEnv)
 	if !ok {
 		log.Fatal("Env var not set: ", BearerTokenEnv)
-	}
-
-	feedUrl, ok := os.LookupEnv(FeedUrlEnv)
-	if !ok {
-		log.Fatal("Env var not set: ", FeedUrlEnv)
 	}
 
 	ts := oauth2.StaticTokenSource(
@@ -154,16 +148,16 @@ func cacheFeed() {
 	tc := oauth2.NewClient(ctx, ts)
 	client := twitter.NewClient(tc)
 
-	tweet_re := regexp.MustCompile(`(.*?)\s(https?://.*)`)
-
 	tweets, _, err := client.Timelines.UserTimeline(
 		&twitter.UserTimelineParams{ScreenName: "atlasobscura"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	return tweets, err
+}
 
+func fetchFeedItems(ctx context.Context, reader tweetReader) []FeedItem {
 	feedItems := make([]FeedItem, 0)
+	tweet_re := regexp.MustCompile(`(.*?)\s(https?://.*)`)
 
+	tweets, err := reader.getTweets(ctx)
 	for _, message := range tweets {
 		tweet := message.Text
 		t := tweet_re.FindStringSubmatch(tweet)
@@ -189,6 +183,21 @@ func cacheFeed() {
 		log.Fatal(err)
 	}
 
+	return feedItems
+}
+
+func cacheFeed(reader tweetReader, feedCache *cache.Cache) {
+	log.Print("Caching feed")
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel() // Cancel context once feeds are fetched
+
+	feedUrl, ok := os.LookupEnv(FeedUrlEnv)
+	if !ok {
+		log.Fatal("Env var not set: ", FeedUrlEnv)
+	}
+
+	feedItems := fetchFeedItems(ctx, reader)
+
 	feed, err := genFeed(feedItems, FeedUrl(feedUrl), time.Now())
 	if err != nil {
 		log.Fatal(err)
@@ -197,19 +206,30 @@ func cacheFeed() {
 	feedCache.Set("feed", feed, cache.NoExpiration)
 }
 
-func fetchFeed(w http.ResponseWriter, req *http.Request) {
+func fetchCachedFeed(reader tweetReader, feedCache *cache.Cache) string {
 	feed, found := feedCache.Get("feed")
 	if !found {
 		log.Print("Cached feed not found")
-		cacheFeed()
+		cacheFeed(reader, feedCache)
 		feed, found = feedCache.Get("feed")
 	}
-	io.WriteString(w, feed.(string))
+	return feed.(string)
+}
+
+func feedHandler(reader tweetReader, feedCache *cache.Cache) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		io.WriteString(w, fetchCachedFeed(reader, feedCache))
+	})
 }
 
 func main() {
+	reader := tweetReaderImpl{}
+
+	// Cache feeds indefinitely
+	feedCache := cache.New(0, 0)
+
 	// Cache feed at startup
-	cacheFeed()
+	cacheFeed(reader, feedCache)
 
 	ticker := time.NewTicker(CacheInterval)
 	defer ticker.Stop()
@@ -222,7 +242,7 @@ func main() {
 			case <-done:
 				return
 			case <-ticker.C:
-				cacheFeed()
+				cacheFeed(reader, feedCache)
 			}
 		}
 	}()
@@ -232,7 +252,7 @@ func main() {
 		Addr:         ":8080",
 		ReadTimeout:  Timeout / 2.0,
 		WriteTimeout: Timeout,
-		Handler: http.TimeoutHandler(http.HandlerFunc(fetchFeed),
+		Handler: http.TimeoutHandler(feedHandler(reader, feedCache),
 			Timeout, "Timeout!\n"),
 	}
 
