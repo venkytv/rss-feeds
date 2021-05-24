@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atlas Obscura</title>
+  <id>http://example.com</id>
+  <updated>2021-05-23T22:51:39+02:00</updated>
+  <subtitle>Atlas Obscura Tweets</subtitle>
+  <link href="http://example.com"></link>
+  <author>
+    <name>Venky</name>
+    <email>venkytv@gmail.com</email>
+  </author>
+  <entry>
+    <title>This Dalecarlian horse is about the size of a pinhead.</title>
+    <updated>2021-05-02T16:00:26+02:00</updated>
+    <id>tag:www.atlasobscura.com,2021-05-02:/places/worlds-smallest-dala-horse</id>
+    <link href="https://www.atlasobscura.com/places/worlds-smallest-dala-horse" rel="alternate"></link>
+    <summary type="html"></summary>
+  </entry>
+</feed>

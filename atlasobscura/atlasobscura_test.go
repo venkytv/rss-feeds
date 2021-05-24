@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
+	"log"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dghubble/go-twitter/twitter"
+	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +45,7 @@ func TestFixAllUrls(t *testing.T) {
 	t.Run("NormalFeed", func(t *testing.T) {
 		datafile, err := os.Open("testdata/feeditems.json")
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer datafile.Close()
 
@@ -53,7 +54,7 @@ func TestFixAllUrls(t *testing.T) {
 		assert.Nil(t, err)
 		err = json.Unmarshal(bytes, &items)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 
 		feedItems = make([]FeedItem, 0)
@@ -82,7 +83,7 @@ func TestFixAllUrls(t *testing.T) {
 		assert.Nil(t, err)
 		bytes, err = ioutil.ReadFile("testdata/feed.xml")
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		wantFeed := strings.TrimSuffix(string(bytes), "\n")
 		assert.Equal(t, wantFeed, feed)
@@ -135,7 +136,7 @@ func TestFetchFeedItems(t *testing.T) {
 			if v.URL != "" {
 				createdAt, err := time.Parse(time.RubyDate, v.CreatedAt)
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				feedItems = append(feedItems, FeedItem{
 					title:   v.Text,
@@ -152,4 +153,42 @@ func TestFetchFeedItems(t *testing.T) {
 		}
 		assert.Equal(t, reader.FeedItems, fetchFeedItems(ctx, reader))
 	})
+}
+
+func TestFetchCachedFeed(t *testing.T) {
+	cacheTime, err := time.Parse(time.RFC3339, "2021-05-23T22:51:39+02:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	feedConfig := FeedConfig{
+		Url:               "http://example.com",
+		Cache:             cache.New(0, 0),
+		CacheTimeOverride: cacheTime,
+	}
+
+	reader := mockTweetReader{
+		Tweets: []twitter.Tweet{
+			{
+				Text:      "This Dalecarlian horse is about the size of a pinhead. https://t.co/IhCehLoHO3",
+				CreatedAt: "Sun May 02 16:00:26 +0200 2021",
+			},
+		},
+	}
+	bytes, err := ioutil.ReadFile("testdata/cached_feed.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFeed := strings.TrimSuffix(string(bytes), "\n")
+	cachedFeed := fetchCachedFeed(reader, feedConfig)
+	assert.Equal(t, wantFeed, cachedFeed)
+
+	time.Sleep(1 * time.Second)
+	cachedFeed = fetchCachedFeed(reader, feedConfig)
+	assert.Equal(t, wantFeed, cachedFeed)
+}
+
+func TestMain(m *testing.M) {
+	// Skip log messages during testing
+	log.SetOutput(ioutil.Discard)
+	os.Exit(m.Run())
 }

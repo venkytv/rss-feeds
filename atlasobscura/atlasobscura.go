@@ -34,6 +34,12 @@ type FeedItem struct {
 	created time.Time
 }
 
+type FeedConfig struct {
+	Url               string
+	Cache             *cache.Cache
+	CacheTimeOverride time.Time // Override for testing
+}
+
 type FeedUrl string
 
 type tweetReader interface {
@@ -186,50 +192,57 @@ func fetchFeedItems(ctx context.Context, reader tweetReader) []FeedItem {
 	return feedItems
 }
 
-func cacheFeed(reader tweetReader, feedCache *cache.Cache) {
+func cacheFeed(reader tweetReader, feedConfig FeedConfig) {
 	log.Print("Caching feed")
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel() // Cancel context once feeds are fetched
 
+	feedItems := fetchFeedItems(ctx, reader)
+
+	feedTime := feedConfig.CacheTimeOverride
+	if feedTime.IsZero() {
+		feedTime = time.Now()
+	}
+
+	feed, err := genFeed(feedItems, FeedUrl(feedConfig.Url), feedTime)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	feedConfig.Cache.Set("feed", feed, cache.NoExpiration)
+}
+
+func fetchCachedFeed(reader tweetReader, feedConfig FeedConfig) string {
+	feed, found := feedConfig.Cache.Get("feed")
+	if !found {
+		log.Print("Cached feed not found")
+		cacheFeed(reader, feedConfig)
+		feed, found = feedConfig.Cache.Get("feed")
+	}
+	return feed.(string)
+}
+
+func feedHandler(reader tweetReader, feedConfig FeedConfig) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		io.WriteString(w, fetchCachedFeed(reader, feedConfig))
+	})
+}
+
+func main() {
 	feedUrl, ok := os.LookupEnv(FeedUrlEnv)
 	if !ok {
 		log.Fatal("Env var not set: ", FeedUrlEnv)
 	}
 
-	feedItems := fetchFeedItems(ctx, reader)
-
-	feed, err := genFeed(feedItems, FeedUrl(feedUrl), time.Now())
-	if err != nil {
-		log.Fatal(err)
+	feedConfig := FeedConfig{
+		Url:   feedUrl,
+		Cache: cache.New(0, 0), // Cache feeds indefinitely
 	}
 
-	feedCache.Set("feed", feed, cache.NoExpiration)
-}
-
-func fetchCachedFeed(reader tweetReader, feedCache *cache.Cache) string {
-	feed, found := feedCache.Get("feed")
-	if !found {
-		log.Print("Cached feed not found")
-		cacheFeed(reader, feedCache)
-		feed, found = feedCache.Get("feed")
-	}
-	return feed.(string)
-}
-
-func feedHandler(reader tweetReader, feedCache *cache.Cache) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		io.WriteString(w, fetchCachedFeed(reader, feedCache))
-	})
-}
-
-func main() {
 	reader := tweetReaderImpl{}
 
-	// Cache feeds indefinitely
-	feedCache := cache.New(0, 0)
-
 	// Cache feed at startup
-	cacheFeed(reader, feedCache)
+	cacheFeed(reader, feedConfig)
 
 	ticker := time.NewTicker(CacheInterval)
 	defer ticker.Stop()
@@ -242,7 +255,7 @@ func main() {
 			case <-done:
 				return
 			case <-ticker.C:
-				cacheFeed(reader, feedCache)
+				cacheFeed(reader, feedConfig)
 			}
 		}
 	}()
@@ -252,7 +265,7 @@ func main() {
 		Addr:         ":8080",
 		ReadTimeout:  Timeout / 2.0,
 		WriteTimeout: Timeout,
-		Handler: http.TimeoutHandler(feedHandler(reader, feedCache),
+		Handler: http.TimeoutHandler(feedHandler(reader, feedConfig),
 			Timeout, "Timeout!\n"),
 	}
 
