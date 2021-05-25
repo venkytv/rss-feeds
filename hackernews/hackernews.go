@@ -235,13 +235,13 @@ func storyHandler(api HackerNewsAPI, feedConfig FeedConfig) http.Handler {
 			})
 		}
 
-		rss, err := feed.ToRss()
+		atom, err := feed.ToAtom()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		io.WriteString(w, rss)
+		io.WriteString(w, atom)
 	})
 }
 
