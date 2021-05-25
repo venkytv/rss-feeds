@@ -221,7 +221,6 @@ func storyHandler(api HackerNewsAPI, feedConfig FeedConfig) http.Handler {
 		for _, story := range stories {
 			link := story.URL
 			source := fmt.Sprintf(HNSourceURL, story.ID)
-			id := fmt.Sprintf("hackernews-%d", story.ID)
 			if link == "" {
 				link = source
 			}
@@ -230,7 +229,7 @@ func storyHandler(api HackerNewsAPI, feedConfig FeedConfig) http.Handler {
 				Link:        &feeds.Link{Href: link},
 				Source:      &feeds.Link{Href: source},
 				Description: story.Text,
-				Id:          id,
+				Id:          source,
 				Created:     story.Time(),
 			})
 		}
