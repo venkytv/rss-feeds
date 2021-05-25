@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Hacker News</title>
+    <link>http://example.com</link>
+    <description>Hacker News Top Stories</description>
+    <managingEditor>venkytv@gmail.com (Venky)</managingEditor>
+    <pubDate>Tue, 25 May 2021 10:29:48 +0200</pubDate>
+    <item>
+      <title>Writing Pythonic Rust</title>
+      <link>http://www.cmyr.net/blog/rust-python-learnings.html</link>
+      <description></description>
+      <guid>hackernews-27267066</guid>
+      <pubDate>Mon, 24 May 2021 19:18:15 +0200</pubDate>
+      <source>https://news.ycombinator.com/item?id=27267066</source>
+    </item>
+    <item>
+      <title>Evidence-based Software Engineering: based on the publicly available data</title>
+      <link>http://www.knosof.co.uk/ESEUR/</link>
+      <description></description>
+      <guid>hackernews-27266551</guid>
+      <pubDate>Mon, 24 May 2021 18:43:30 +0200</pubDate>
+      <source>https://news.ycombinator.com/item?id=27266551</source>
+    </item>
+    <item>
+      <title>Complexity is a source of income in open source ecosystems (2019)</title>
+      <link>https://www.r-bloggers.com/2019/07/complexity-is-a-source-of-income-in-open-source-ecosystems/</link>
+      <description></description>
+      <guid>hackernews-27266485</guid>
+      <pubDate>Mon, 24 May 2021 18:39:07 +0200</pubDate>
+      <source>https://news.ycombinator.com/item?id=27266485</source>
+    </item>
+    <item>
+      <title>Magic Wormhole: Get things from one computer to another, safely</title>
+      <link>https://github.com/magic-wormhole/magic-wormhole</link>
+      <description></description>
+      <guid>hackernews-27262193</guid>
+      <pubDate>Mon, 24 May 2021 10:37:35 +0200</pubDate>
+      <source>https://news.ycombinator.com/item?id=27262193</source>
+    </item>
+    <item>
+      <title>Ask HN: Favorite purchases of last two years?</title>
+      <link>https://news.ycombinator.com/item?id=27219759</link>
+      <description>I&amp;#x27;ve abandoned all faith in reviews online.  But the HN crew can give good advice and are extremely unlikely to shill garbage.  Consumer Reports is great for finding which manufacturer&amp;#x2F;model to buy.  But what product or service did you buy that you found really useful&amp;#x2F;entertaining?&lt;p&gt;I&amp;#x27;ll start: I caved and bought a robovac.  Wow, unlike many techno-gadgets, this one really delivers.  Real utility, not just taking up space.  Low maintenance, runs while I sleep, and the floor is just cleaner.</description>
+      <guid>hackernews-27219759</guid>
+      <pubDate>Thu, 20 May 2021 13:27:51 +0200</pubDate>
+      <source>https://news.ycombinator.com/item?id=27219759</source>
+    </item>
+  </channel>
+</rss>
