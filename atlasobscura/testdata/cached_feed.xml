@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">
   <title>Atlas Obscura</title>
-  <id>http://example.com</id>
+  <id>https://www.atlasobscura.com</id>
   <updated>2021-05-23T22:51:39+02:00</updated>
   <subtitle>Atlas Obscura Tweets</subtitle>
-  <link href="http://example.com"></link>
+  <link href="https://www.atlasobscura.com"></link>
   <author>
     <name>Venky</name>
     <email>venkytv@gmail.com</email>

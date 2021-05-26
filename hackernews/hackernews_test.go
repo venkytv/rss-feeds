@@ -52,7 +52,6 @@ func TestGetTopStories(t *testing.T) {
 
 	cacheTime, err := time.Parse(time.RFC3339, "2021-05-25T10:29:48+02:00")
 	feedConfig := FeedConfig{
-		URL:               "http://example.com",
 		Cache:             cache.New(0, 0),
 		CacheTimeOverride: cacheTime,
 	}

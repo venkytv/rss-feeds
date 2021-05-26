@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"sync"
@@ -19,12 +18,12 @@ import (
 )
 
 const (
-	FeedURLEnv      = "FEED_URL"
+	FeedURL         = "https://news.ycombinator.com/best"
 	FeedTitle       = "Hacker News"
 	FeedDescription = "Hacker News Top Stories"
 	FeedAuthor      = "Venky"
 	FeedAuthorEmail = "venkytv@gmail.com"
-	StoryListURL    = "https://hacker-news.firebaseio.com/v0/topstories.json"
+	StoryListURL    = "https://hacker-news.firebaseio.com/v0/beststories.json"
 	StoryURL        = "https://hacker-news.firebaseio.com/v0/item/%d.json"
 	HNSourceURL     = "https://news.ycombinator.com/item?id=%d"
 	Timeout         = 10 * time.Second
@@ -55,7 +54,6 @@ func (s Story) Time() time.Time {
 }
 
 type FeedConfig struct {
-	URL               string
 	Cache             *cache.Cache
 	CacheTimeOverride time.Time // Override for testing
 }
@@ -213,7 +211,7 @@ func storyHandler(api HackerNewsAPI, feedConfig FeedConfig) http.Handler {
 
 		feed := &feeds.Feed{
 			Title:       FeedTitle,
-			Link:        &feeds.Link{Href: feedConfig.URL},
+			Link:        &feeds.Link{Href: FeedURL},
 			Description: FeedDescription,
 			Author:      &feeds.Author{Name: FeedAuthor, Email: FeedAuthorEmail},
 			Created:     feedConfig.CacheTime(),
@@ -245,11 +243,6 @@ func storyHandler(api HackerNewsAPI, feedConfig FeedConfig) http.Handler {
 }
 
 func main() {
-	feedURL, ok := os.LookupEnv(FeedURLEnv)
-	if !ok {
-		log.Fatal("Env var not set: ", FeedURLEnv)
-	}
-
 	api := HackerNewsAPI{
 		StoryList: StoryListURL,
 		Story:     StoryURL,
@@ -257,7 +250,6 @@ func main() {
 
 	storyCache := cache.New(CacheTime, 2*CacheTime)
 	feedConfig := FeedConfig{
-		URL:   feedURL,
 		Cache: storyCache,
 	}
 

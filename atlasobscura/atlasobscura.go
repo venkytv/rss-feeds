@@ -19,7 +19,7 @@ import (
 
 const (
 	BearerTokenEnv  = "TWITTER_BEARER_TOKEN"
-	FeedUrlEnv      = "FEED_URL"
+	FeedURL         = "https://www.atlasobscura.com"
 	FeedTitle       = "Atlas Obscura"
 	FeedDescription = "Atlas Obscura Tweets"
 	FeedAuthor      = "Venky"
@@ -35,12 +35,9 @@ type FeedItem struct {
 }
 
 type FeedConfig struct {
-	Url               string
 	Cache             *cache.Cache
 	CacheTimeOverride time.Time // Override for testing
 }
-
-type FeedUrl string
 
 type tweetReader interface {
 	getTweets(context.Context) ([]twitter.Tweet, error)
@@ -48,7 +45,7 @@ type tweetReader interface {
 
 var utm_re = regexp.MustCompile(`\?utm_.*$`)
 
-func genFeed(items []FeedItem, url FeedUrl, createTime time.Time) (string, error) {
+func genFeed(items []FeedItem, url string, createTime time.Time) (string, error) {
 	feed := &feeds.Feed{
 		Title:       FeedTitle,
 		Link:        &feeds.Link{Href: string(url)},
@@ -204,7 +201,7 @@ func cacheFeed(reader tweetReader, feedConfig FeedConfig) {
 		feedTime = time.Now()
 	}
 
-	feed, err := genFeed(feedItems, FeedUrl(feedConfig.Url), feedTime)
+	feed, err := genFeed(feedItems, FeedURL, feedTime)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -229,13 +226,7 @@ func feedHandler(reader tweetReader, feedConfig FeedConfig) http.Handler {
 }
 
 func main() {
-	feedUrl, ok := os.LookupEnv(FeedUrlEnv)
-	if !ok {
-		log.Fatal("Env var not set: ", FeedUrlEnv)
-	}
-
 	feedConfig := FeedConfig{
-		Url:   feedUrl,
 		Cache: cache.New(0, 0), // Cache feeds indefinitely
 	}
 

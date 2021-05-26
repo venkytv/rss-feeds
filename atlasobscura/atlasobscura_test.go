@@ -77,7 +77,7 @@ func TestFixAllUrls(t *testing.T) {
 		assert.Equal(t, wantItems, feedItems)
 
 		feed, err := genFeed(feedItems,
-			FeedUrl("http://example.com"),
+			FeedURL,
 			time.Date(2021, time.May, 2, 15, 0, 0, 0, time.UTC),
 		)
 		assert.Nil(t, err)
@@ -161,7 +161,6 @@ func TestFetchCachedFeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	feedConfig := FeedConfig{
-		Url:               "http://example.com",
 		Cache:             cache.New(0, 0),
 		CacheTimeOverride: cacheTime,
 	}

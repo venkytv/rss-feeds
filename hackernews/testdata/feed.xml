@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">
   <title>Hacker News</title>
-  <id>http://example.com</id>
+  <id>https://news.ycombinator.com/best</id>
   <updated>2021-05-25T10:29:48+02:00</updated>
   <subtitle>Hacker News Top Stories</subtitle>
-  <link href="http://example.com"></link>
+  <link href="https://news.ycombinator.com/best"></link>
   <author>
     <name>Venky</name>
     <email>venkytv@gmail.com</email>
