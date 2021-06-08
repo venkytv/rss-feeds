@@ -61,14 +61,14 @@ func TestFixAllUrls(t *testing.T) {
 		wantItems := make([]FeedItem, 0)
 		for _, item := range items {
 			feedItems = append(feedItems, FeedItem{
-				title:   item.Title,
-				url:     item.Url,
-				created: item.Created,
+				Title:   item.Title,
+				Url:     item.Url,
+				Created: item.Created,
 			})
 			wantItems = append(wantItems, FeedItem{
-				title:   item.Title,
-				url:     item.FixedUrl,
-				created: item.Created,
+				Title:   item.Title,
+				Url:     item.FixedUrl,
+				Created: item.Created,
 			})
 		}
 		feedItems, err = fixAllUrls(ctx, feedItems)
@@ -140,9 +140,9 @@ func TestFetchFeedItems(t *testing.T) {
 					t.Fatal(err)
 				}
 				feedItems = append(feedItems, FeedItem{
-					title:   v.Text,
-					url:     v.URL,
-					created: createdAt,
+					Title:   v.Text,
+					Url:     v.URL,
+					Created: createdAt,
 				})
 			}
 

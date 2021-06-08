@@ -30,9 +30,9 @@ const (
 )
 
 type FeedItem struct {
-	title   string
-	url     string
-	created time.Time
+	Title   string
+	Url     string
+	Created time.Time
 }
 
 type FeedConfig struct {
@@ -64,9 +64,9 @@ func genFeed(items []FeedItem, url string, createTime time.Time) (string, error)
 	}
 	for _, item := range items {
 		feed.Add(&feeds.Item{
-			Title:   item.title,
-			Link:    &feeds.Link{Href: item.url},
-			Created: item.created,
+			Title:   item.Title,
+			Link:    &feeds.Link{Href: item.Url},
+			Created: item.Created,
 		})
 	}
 
@@ -88,24 +88,24 @@ func gen(items []FeedItem) <-chan FeedItem {
 	return out
 }
 
-type result struct {
-	item FeedItem
-	err  error
+type Result struct {
+	Item  FeedItem
+	Error error
 }
 
-func fixer(ctx context.Context, items <-chan FeedItem, c chan<- result) {
+func fixer(ctx context.Context, items <-chan FeedItem, c chan<- Result) {
 	for item := range items {
 		client := http.Client{
 			Timeout: Timeout,
 		}
-		resp, err := client.Head(item.url)
+		resp, err := client.Head(item.Url)
 		if err == nil {
 			url := utm_re.ReplaceAllString(
 				resp.Request.URL.String(), "")
-			item.url = url
+			item.Url = url
 		}
 		select {
-		case c <- result{item, err}:
+		case c <- Result{item, err}:
 		case <-ctx.Done():
 			return
 		}
@@ -116,7 +116,7 @@ func fixAllUrls(ctx context.Context, items []FeedItem) ([]FeedItem, error) {
 	items_chan := gen(items)
 
 	// Start a fixed number of channels to fix URLs
-	c := make(chan result)
+	c := make(chan Result)
 	var wg sync.WaitGroup
 	const numFixers = 10
 	wg.Add(numFixers)
@@ -133,14 +133,14 @@ func fixAllUrls(ctx context.Context, items []FeedItem) ([]FeedItem, error) {
 
 	out := make([]FeedItem, 0)
 	for r := range c {
-		if r.err != nil {
-			return nil, r.err
+		if r.Error != nil {
+			return nil, r.Error
 		}
-		out = append(out, r.item)
+		out = append(out, r.Item)
 	}
 
 	sort.Slice(out, func(i, j int) bool {
-		return out[i].created.After(out[j].created)
+		return out[i].Created.After(out[j].Created)
 	})
 
 	return out, nil
@@ -226,9 +226,9 @@ func fetchFeedItems(ctx context.Context, reader tweetReader) ([]FeedItem, error)
 			continue
 		}
 		feedItems = append(feedItems, FeedItem{
-			title:   text,
-			url:     url,
-			created: createdAt,
+			Title:   text,
+			Url:     url,
+			Created: createdAt,
 		})
 	}
 
