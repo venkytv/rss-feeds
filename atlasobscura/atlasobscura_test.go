@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dghubble/go-twitter/twitter"
+	twitter "github.com/g8rswimmer/go-twitter"
 	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,11 +23,11 @@ type TestFeedItem struct {
 }
 
 type mockTweetReader struct {
-	Tweets    []twitter.Tweet
+	Tweets    []twitter.TweetObj
 	FeedItems []FeedItem
 }
 
-func (reader mockTweetReader) getTweets(context.Context) ([]twitter.Tweet, error) {
+func (reader mockTweetReader) getTweets(context.Context) ([]twitter.TweetObj, error) {
 	return reader.Tweets, nil
 }
 
@@ -95,11 +95,12 @@ func TestFetchFeedItems(t *testing.T) {
 
 	t.Run("EmptyReader", func(t *testing.T) {
 		reader := mockTweetReader{
-			Tweets:    []twitter.Tweet{},
+			Tweets:    []twitter.TweetObj{},
 			FeedItems: []FeedItem{},
 		}
-
-		assert.Equal(t, reader.FeedItems, fetchFeedItems(ctx, reader))
+		feedItems, err := fetchFeedItems(ctx, reader)
+		assert.Nil(t, err)
+		assert.Equal(t, reader.FeedItems, feedItems)
 	})
 
 	t.Run("NormalReader", func(t *testing.T) {
@@ -111,16 +112,16 @@ func TestFetchFeedItems(t *testing.T) {
 			{
 				Text:      "Foo",
 				URL:       "http://example.com",
-				CreatedAt: "Sun May 23 19:30:00 +0200 2021",
+				CreatedAt: "2021-05-23T19:30:00+02:00",
 			},
 			{
 				Text:      "No URL",
 				URL:       "",
-				CreatedAt: "Sat May 22 09:15:00 +0000 2021",
+				CreatedAt: "2021-05-22T09:15:00+00:00",
 			},
 		}
 
-		tweets := make([]twitter.Tweet, len(data))
+		tweets := make([]twitter.TweetObj, len(data))
 		feedItems := make([]FeedItem, 0)
 		for i, v := range data {
 			text := v.Text
@@ -128,13 +129,13 @@ func TestFetchFeedItems(t *testing.T) {
 				text += " " + v.URL
 			}
 
-			tweets[i] = twitter.Tweet{
+			tweets[i] = twitter.TweetObj{
 				Text:      text,
 				CreatedAt: v.CreatedAt,
 			}
 
 			if v.URL != "" {
-				createdAt, err := time.Parse(time.RubyDate, v.CreatedAt)
+				createdAt, err := time.Parse(time.RFC3339, v.CreatedAt)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -151,11 +152,15 @@ func TestFetchFeedItems(t *testing.T) {
 			Tweets:    tweets,
 			FeedItems: feedItems,
 		}
-		assert.Equal(t, reader.FeedItems, fetchFeedItems(ctx, reader))
+		feedItems, err := fetchFeedItems(ctx, reader)
+		assert.Nil(t, err)
+		assert.Equal(t, reader.FeedItems, feedItems)
 	})
 }
 
 func TestFetchCachedFeed(t *testing.T) {
+	ctx := context.Background()
+
 	cacheTime, err := time.Parse(time.RFC3339, "2021-05-23T22:51:39+02:00")
 	if err != nil {
 		t.Fatal(err)
@@ -166,10 +171,10 @@ func TestFetchCachedFeed(t *testing.T) {
 	}
 
 	reader := mockTweetReader{
-		Tweets: []twitter.Tweet{
+		Tweets: []twitter.TweetObj{
 			{
 				Text:      "This Dalecarlian horse is about the size of a pinhead. https://t.co/IhCehLoHO3",
-				CreatedAt: "Sun May 02 16:00:26 +0200 2021",
+				CreatedAt: "2021-05-02T16:00:26+02:00",
 			},
 		},
 	}
@@ -178,11 +183,11 @@ func TestFetchCachedFeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantFeed := strings.TrimSuffix(string(bytes), "\n")
-	cachedFeed := fetchCachedFeed(reader, feedConfig)
+	cachedFeed := fetchCachedFeed(ctx, reader, feedConfig)
 	assert.Equal(t, wantFeed, cachedFeed)
 
 	time.Sleep(1 * time.Second)
-	cachedFeed = fetchCachedFeed(reader, feedConfig)
+	cachedFeed = fetchCachedFeed(ctx, reader, feedConfig)
 	assert.Equal(t, wantFeed, cachedFeed)
 }
 

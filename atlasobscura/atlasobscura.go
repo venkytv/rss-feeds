@@ -11,14 +11,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dghubble/go-twitter/twitter"
+	twitter "github.com/g8rswimmer/go-twitter"
 	"github.com/gorilla/feeds"
 	"github.com/patrickmn/go-cache"
-	"golang.org/x/oauth2"
 )
 
 const (
 	BearerTokenEnv  = "TWITTER_BEARER_TOKEN"
+	ScreenName      = "atlasobscura"
+	NumTweets       = 20
 	FeedURL         = "https://www.atlasobscura.com"
 	FeedTitle       = "Atlas Obscura"
 	FeedDescription = "Atlas Obscura Tweets"
@@ -40,7 +41,15 @@ type FeedConfig struct {
 }
 
 type tweetReader interface {
-	getTweets(context.Context) ([]twitter.Tweet, error)
+	getTweets(context.Context) ([]twitter.TweetObj, error)
+}
+
+type authorize struct {
+	Token string
+}
+
+func (a authorize) Add(req *http.Request) {
+	req.Header.Add("Authorization", "Bearer "+a.Token)
 }
 
 var utm_re = regexp.MustCompile(`\?utm_.*$`)
@@ -137,30 +146,70 @@ func fixAllUrls(ctx context.Context, items []FeedItem) ([]FeedItem, error) {
 	return out, nil
 }
 
-type tweetReaderImpl struct{}
+type tweetReaderImpl struct {
+	User      *twitter.User
+	TweetOpts twitter.UserTimelineOpts
+}
 
-func (r tweetReaderImpl) getTweets(ctx context.Context) ([]twitter.Tweet, error) {
+func newTweetReader(ctx context.Context) tweetReaderImpl {
 	token, ok := os.LookupEnv(BearerTokenEnv)
 	if !ok {
 		log.Fatal("Env var not set: ", BearerTokenEnv)
 	}
 
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := twitter.NewClient(tc)
+	user := &twitter.User{
+		Authorizer: authorize{
+			Token: token,
+		},
+		Client: http.DefaultClient,
+		Host:   "https://api.twitter.com",
+	}
 
-	tweets, _, err := client.Timelines.UserTimeline(
-		&twitter.UserTimelineParams{ScreenName: "atlasobscura"})
-	return tweets, err
+	tweetOpts := twitter.UserTimelineOpts{
+		TweetFields: []twitter.TweetField{
+			twitter.TweetFieldID,
+			twitter.TweetFieldSource,
+			twitter.TweetFieldText,
+			twitter.TweetFieldCreatedAt,
+		},
+		UserFields: []twitter.UserField{},
+		MaxResults: NumTweets,
+	}
+
+	return tweetReaderImpl{
+		User:      user,
+		TweetOpts: tweetOpts,
+	}
 }
 
-func fetchFeedItems(ctx context.Context, reader tweetReader) []FeedItem {
+func (r tweetReaderImpl) getTweets(ctx context.Context) ([]twitter.TweetObj, error) {
+	lookups, err := r.User.LookupUsername(ctx, []string{ScreenName},
+		twitter.UserFieldOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var userID string
+	for u := range lookups {
+		userID = u
+		break
+	}
+
+	tweets, err := r.User.Tweets(ctx, userID, r.TweetOpts)
+	if err != nil {
+		return nil, err
+	}
+	return tweets.Tweets, err
+}
+
+func fetchFeedItems(ctx context.Context, reader tweetReader) ([]FeedItem, error) {
 	feedItems := make([]FeedItem, 0)
 	tweet_re := regexp.MustCompile(`(.*?)\s(https?://.*)`)
 
 	tweets, err := reader.getTweets(ctx)
+	if err != nil {
+		return feedItems, err
+	}
 	for _, message := range tweets {
 		tweet := message.Text
 		t := tweet_re.FindStringSubmatch(tweet)
@@ -170,9 +219,11 @@ func fetchFeedItems(ctx context.Context, reader tweetReader) []FeedItem {
 		}
 		text := t[1]
 		url := t[2]
-		createdAt, err := message.CreatedAtTime()
+
+		createdAt, err := time.Parse(time.RFC3339, message.CreatedAt)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Failed to parse time: %v: %v", message, err)
+			continue
 		}
 		feedItems = append(feedItems, FeedItem{
 			title:   text,
@@ -186,15 +237,16 @@ func fetchFeedItems(ctx context.Context, reader tweetReader) []FeedItem {
 		log.Fatal(err)
 	}
 
-	return feedItems
+	return feedItems, nil
 }
 
-func cacheFeed(reader tweetReader, feedConfig FeedConfig) {
+func cacheFeed(ctx context.Context, reader tweetReader, feedConfig FeedConfig) {
 	log.Print("Caching feed")
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel() // Cancel context once feeds are fetched
-
-	feedItems := fetchFeedItems(ctx, reader)
+	feedItems, err := fetchFeedItems(ctx, reader)
+	if err != nil {
+		log.Printf("Failed to update cache: %v\n", err)
+		return
+	}
 
 	feedTime := feedConfig.CacheTimeOverride
 	if feedTime.IsZero() {
@@ -209,31 +261,34 @@ func cacheFeed(reader tweetReader, feedConfig FeedConfig) {
 	feedConfig.Cache.Set("feed", feed, cache.NoExpiration)
 }
 
-func fetchCachedFeed(reader tweetReader, feedConfig FeedConfig) string {
+func fetchCachedFeed(ctx context.Context, reader tweetReader, feedConfig FeedConfig) string {
 	feed, found := feedConfig.Cache.Get("feed")
 	if !found {
 		log.Print("Cached feed not found")
-		cacheFeed(reader, feedConfig)
+		cacheFeed(ctx, reader, feedConfig)
 		feed, found = feedConfig.Cache.Get("feed")
 	}
 	return feed.(string)
 }
 
-func feedHandler(reader tweetReader, feedConfig FeedConfig) http.Handler {
+func feedHandler(ctx context.Context, reader tweetReader, feedConfig FeedConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		io.WriteString(w, fetchCachedFeed(reader, feedConfig))
+		io.WriteString(w, fetchCachedFeed(ctx, reader, feedConfig))
 	})
 }
 
 func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel() // Cancel context once feeds are fetched
+
 	feedConfig := FeedConfig{
 		Cache: cache.New(0, 0), // Cache feeds indefinitely
 	}
 
-	reader := tweetReaderImpl{}
+	reader := newTweetReader(ctx)
 
 	// Cache feed at startup
-	cacheFeed(reader, feedConfig)
+	cacheFeed(ctx, reader, feedConfig)
 
 	ticker := time.NewTicker(CacheInterval)
 	defer ticker.Stop()
@@ -246,7 +301,7 @@ func main() {
 			case <-done:
 				return
 			case <-ticker.C:
-				cacheFeed(reader, feedConfig)
+				cacheFeed(ctx, reader, feedConfig)
 			}
 		}
 	}()
@@ -256,7 +311,7 @@ func main() {
 		Addr:         ":8080",
 		ReadTimeout:  Timeout / 2.0,
 		WriteTimeout: Timeout,
-		Handler: http.TimeoutHandler(feedHandler(reader, feedConfig),
+		Handler: http.TimeoutHandler(feedHandler(ctx, reader, feedConfig),
 			Timeout, "Timeout!\n"),
 	}
 
