@@ -101,6 +101,22 @@ func TestGetTopStories(t *testing.T) {
 	})
 }
 
+func TestUnrollTwitterThread(t *testing.T) {
+	URL := "https://twitter.com/BrantlyMillegan/status/1402388133086367751"
+	unrolledURL := "https://threadreaderapp.com/thread/1402388133086367751.html"
+	stories := []Story{
+		{
+			ID:        123,
+			By:        "Someone",
+			Score:     100,
+			Timestamp: 1624096448,
+			URL:       URL,
+		},
+	}
+	stories = unrollTwitterThread(stories)
+	assert.Equal(t, unrolledURL, stories[0].URL)
+}
+
 func TestMain(m *testing.M) {
 	// Skip log messages during testing
 	log.SetOutput(ioutil.Discard)

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"sync"
@@ -26,6 +27,8 @@ const (
 	StoryListURL    = "https://hacker-news.firebaseio.com/v0/beststories.json"
 	StoryURL        = "https://hacker-news.firebaseio.com/v0/item/%d.json"
 	HNSourceURL     = "https://news.ycombinator.com/item?id=%d"
+	TwitterRE       = `^https://twitter\.com/.*/status/(\d+)`
+	ThreaderURL     = "https://threadreaderapp.com/thread/%s.html"
 	Timeout         = 10 * time.Second
 	CacheTime       = 24 * time.Hour
 	RefreshInterval = 10 * time.Minute
@@ -201,6 +204,21 @@ func getTopStories(api HackerNewsAPI, storyCache *cache.Cache) ([]Story, error) 
 	return stories, nil
 }
 
+func unrollTwitterThread(stories []Story) []Story {
+	re, err := regexp.Compile(TwitterRE)
+	if err != nil {
+		log.Println(err)
+		return stories
+	}
+	for idx, _ := range stories {
+		m := re.FindStringSubmatch(stories[idx].URL)
+		if len(m) > 0 {
+			stories[idx].URL = fmt.Sprintf(ThreaderURL, m[1])
+		}
+	}
+	return stories
+}
+
 func storyHandler(api HackerNewsAPI, feedConfig FeedConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		stories, err := getTopStories(api, feedConfig.Cache)
@@ -208,6 +226,8 @@ func storyHandler(api HackerNewsAPI, feedConfig FeedConfig) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		stories = unrollTwitterThread(stories)
 
 		feed := &feeds.Feed{
 			Title:       FeedTitle,
