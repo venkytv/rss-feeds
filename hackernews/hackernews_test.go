@@ -103,7 +103,7 @@ func TestGetTopStories(t *testing.T) {
 
 func TestUnrollTwitterThread(t *testing.T) {
 	URL := "https://twitter.com/BrantlyMillegan/status/1402388133086367751"
-	unrolledURL := "https://threadreaderapp.com/thread/1402388133086367751.html"
+	unrolledURL := "https://nitter.net/BrantlyMillegan/status/1402388133086367751"
 	stories := []Story{
 		{
 			ID:        123,

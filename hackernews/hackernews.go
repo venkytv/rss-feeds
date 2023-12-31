@@ -27,8 +27,8 @@ const (
 	StoryListURL    = "https://hacker-news.firebaseio.com/v0/beststories.json"
 	StoryURL        = "https://hacker-news.firebaseio.com/v0/item/%d.json"
 	HNSourceURL     = "https://news.ycombinator.com/item?id=%d"
-	TwitterRE       = `^https://twitter\.com/.*/status/(\d+)`
-	ThreaderURL     = "https://threadreaderapp.com/thread/%s.html"
+	TwitterRE       = `^https://(?:twitter|x)\.com/(.*)`
+	ThreaderURL     = "https://nitter.net/%s"
 	Timeout         = 10 * time.Second
 	CacheTime       = 24 * time.Hour
 	RefreshInterval = 10 * time.Minute
